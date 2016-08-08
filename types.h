@@ -62,4 +62,13 @@ typedef struct {
 
 } Column_info_t;
 
+// used for getting the data
+typedef
+enum {
+    ANY_INTEGER,
+    ANY_NUMERICAL,
+    TEXT,
+    CHAR1
+} expectType;
+
 #endif

@@ -67,7 +67,7 @@ static void process(PG_FUNCTION_ARGS) {
 
      /*
     Create edge subset
-    select v.id, v.parent, v.value, e.from, e.cost from E e, V v where v.id = e.to and v.id >= v1 and v.id <= v2
+    select v.id, v.parent, v.value, e.to, e.cost from E e, V v where v.id = e.to and v.id >= v1 and v.id <= v2
                                                                         and  e.from >= v1 and e.from <= v2  
     */
     pgr_SPI_connect();
@@ -83,7 +83,21 @@ static void process(PG_FUNCTION_ARGS) {
     const int tuple_limit = 1000000;
     edge_t *edges;
     Column_info_t info[5];
+    
+    int i;
+    for (i = 0; i < 5; ++i) {
+        info[i].colNumber = -1;
+        info[i].type = 0;
+        info[i].strict = true;
+        info[i].eType = ANY_INTEGER;
+    }
+    info[0].name = strdup("id");
+    info[1].name = strdup("parent");
+    info[2].name = strdup("value");
+    info[3].name = strdup("to");
+    info[4].name = strdup("cost");
 
+    
     while (moredata == TRUE) {
         SPI_cursor_fetch(SPIportal, TRUE, tuple_limit);
         ntuples = SPI_processed;
@@ -107,11 +121,7 @@ static void process(PG_FUNCTION_ARGS) {
 
             for (t = 0; t < ntuples; t++) {
                 HeapTuple tuple = tuptable->vals[t];
-                info[0]
-                pgr_fetch_edge(&tuple, &tupdesc, info,
-                        &default_id, -1,
-                        &(*edges)[total_tuples - ntuples + t],
-                        &valid_edges);
+                pgr_fetch_edge(&tuple, &tupdesc, info, &(*edges)[total_tuples - ntuples + t]);
             }
             SPI_freetuptable(tuptable);
         } else {
@@ -170,28 +180,20 @@ typedef struct edge
   int64 to;
   int64 cost;
 } edge_t;
-v.id, v.parent, v.value, e.from, e.cost
+v.id, v.parent, v.value, e.to, e.cost
 */
-static void pgr_fetch_edge(HeapTuple *tuple, TupleDesc *tupdesc, edge_t *edge) {
+static void pgr_fetch_edge(HeapTuple *tuple, TupleDesc *tupdesc, Column_info_t info[5], edge_t *edge) {
     
-    edge->from = 
-    edge->source = pgr_SPI_getBigInt(tuple, tupdesc,  info[1]);
-    edge->target = pgr_SPI_getBigInt(tuple, tupdesc, info[2]);
-    edge->cost = pgr_SPI_getFloat8(tuple, tupdesc, info[3]);
-
-    if (column_found(info[4].colNumber)) {
-        edge->reverse_cost = pgr_SPI_getFloat8(tuple, tupdesc, info[4]);
-    } else {
-        edge->reverse_cost = default_rcost;
-    }
-
-    *valid_edges = edge->cost < 0? *valid_edges: *valid_edges + 1;
-    *valid_edges = edge->reverse_cost < 0? *valid_edges: *valid_edges + 1;
+    edge->from = get_Int64(tuple, tupdesc,  info[0]); 
+    edge->parent = get_Int64(tuple, tupdesc, info[1]);
+    edge->value = get_Int64(tuple, tupdesc, info[2]);
+    edge->to = get_Int64(tuple, tupdesc,  info[3]);
+    edge->cost = get_Int64(tuple, tupdesc, info[4]);
 }
 
 //int64 id;
 //  int64 accum;
-update_t* scatter(int64 value, edge_t *e){
+update_t* scatter(edge_t *e){
     update_t *u = (update_t *)palloc(sizeof(update_t));
      if ((*u) == NULL) {
                 elog(ERROR, "Out of memory for update struct");
